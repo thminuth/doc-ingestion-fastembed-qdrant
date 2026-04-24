@@ -1,0 +1,97 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start: FastEmbed Server",
+      "type": "shell",
+      "command": "npm run start:cpu",
+      "options": {
+        "cwd": "${workspaceFolder}/fastembed-server"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(ERROR)\\s+(.*)$",
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Application startup complete|All models ready\\. Server is up\\."
+        }
+      },
+      "presentation": {
+        "label": "FastEmbed Server",
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Start: Ingestion Server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/ingestion-server"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(ERROR)\\s+(.*)$",
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Server läuft auf Port|Server running on port"
+        }
+      },
+      "presentation": {
+        "label": "Ingestion Server",
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Start: UI",
+      "type": "shell",
+      "command": "npm start",
+      "options": {
+        "cwd": "${workspaceFolder}/doc-ingestion-ui"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(ERROR)\\s+(.*)$",
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Application bundle generation complete\\.?"
+        }
+      },
+      "presentation": {
+        "label": "UI (Angular)",
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Start: All Services",
+      "dependsOn": [
+        "Start: FastEmbed Server",
+        "Start: Ingestion Server",
+        "Start: UI"
+      ],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "never"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

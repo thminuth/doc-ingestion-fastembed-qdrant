@@ -1,0 +1,153 @@
+<div class="panel-container">
+  <div class="panel-header">
+    <div class="db-selector-row">
+      <div style="flex: 1;">
+        <h3 style="margin: 0; color: #111827;">Qdrant Vector Database</h3>
+        <p style="margin: 0; font-size: 0.85em; color: #6b7280;">ColBERT Multi-Vector Mode</p>
+      </div>
+
+      <button nz-button nzType="primary" nzDanger [nzLoading]="isClearing" (click)="clearDatabase()" nz-tooltip
+        nzTooltipTitle="Alle Dokumente aus dieser DB löschen" style="margin-top: 20px;">
+        <span nz-icon nzType="delete"></span>
+        Clear DB
+      </button>
+    </div>
+
+    <div class="model-selection">
+      <div class="db-info">
+        <div class="db-badge">
+          <i nz-icon nzType="database" nzTheme="outline"></i>
+          <span>Qdrant (Multi-Vector)</span>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="config-item">
+          <label>Embedding Engine</label>
+          <nz-select [(ngModel)]="selectedEmbeddingProvider" style="width: 100%;" [nzDisabled]="true">
+            <nz-option nzValue="fastembed" nzLabel="FastEmbed (In-Process ONNX)"></nz-option>
+          </nz-select>
+        </div>
+
+        <div class="config-item" *ngIf="availableEmbedders">
+          <label>FastEmbed Strategie</label>
+          <nz-select [(ngModel)]="strategy" (ngModelChange)="onProviderChange()" style="width: 100%;">
+            <nz-option nzValue="dense" nzLabel="Dense (Standard)"></nz-option>
+            <nz-option nzValue="late_interaction" nzLabel="ColBERT (Late Interaction)"></nz-option>
+            <nz-option nzValue="rerank" nzLabel="Cross-Encoder (Rerank)"></nz-option>
+            <nz-option nzValue="colbert_rerank" nzLabel="ColBERT + Rerank (Hybrid)"></nz-option>
+          </nz-select>
+        </div>
+
+        <div class="config-item"
+          *ngIf="availableEmbedders && availableEmbedders[strategy] && strategy !== 'colbert_rerank'">
+          <label>FastEmbed Modell</label>
+          <nz-select [(ngModel)]="selectedModel" (ngModelChange)="onModelChange()" style="width: 100%;">
+            <nz-option *ngFor="let m of currentFastEmbedModels" [nzValue]="m" [nzLabel]="m"></nz-option>
+          </nz-select>
+        </div>
+      </div>
+      <div class="search-settings">
+        <div style="margin-bottom: 20px;">
+          <small style="font-weight: 600; color: #6b7280; display: block; margin-bottom: 4px;">Vektor-Schwelle: {{
+            searchThreshold | percent }}</small>
+          <nz-slider [nzMin]="0" [nzMax]="1" [nzStep]="0.01" [(ngModel)]="searchThreshold"
+            (nzOnAfterChange)="onModelChange()"></nz-slider>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <small style="font-weight: 600; color: #6b7280;">Top Ergebnisse: {{ searchLimit }}</small>
+            <nz-input-number [(ngModel)]="searchLimit" [nzMin]="1" [nzMax]="100" [nzStep]="1"
+              (ngModelChange)="onModelChange()" nzSize="small"></nz-input-number>
+          </div>
+          <nz-slider [nzMin]="1" [nzMax]="100" [nzStep]="1" [(ngModel)]="searchLimit"
+            (nzOnAfterChange)="onModelChange()"></nz-slider>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nz-spin [nzSpinning]="isUploading" nzTip="Verarbeite Dokumente...">
+    <nz-upload nzType="drag" [nzMultiple]="true" nzDirectory [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false"
+      class="upload-box">
+      <p class="ant-upload-drag-icon">
+        <span nz-icon nzType="inbox"></span>
+      </p>
+      <p class="ant-upload-text">Dokumente hier ablegen</p>
+      <p class="ant-upload-hint">PDF, DOCX, MD (max 20MB)</p>
+    </nz-upload>
+  </nz-spin>
+
+  <div class="result-area" *ngIf="uploadResults.length > 0 || errorMessages.length > 0">
+    <nz-alert *ngIf="errorMessages.length > 0" nzType="error" nzShowIcon
+      [nzMessage]="errorMessages.length + ' Fehler beim Upload'" [nzDescription]="errorDescription"
+      class="mb-4"></nz-alert>
+
+    <ng-template #errorDescription>
+      <ul style="padding-left: 20px; margin-top: 8px; color: #ff4d4f;">
+        <li *ngFor="let err of errorMessages">{{ err }}</li>
+      </ul>
+    </ng-template>
+  </div>
+
+  <nz-divider nzText="Vergleichen"></nz-divider>
+
+  <nz-spin [nzSpinning]="isComparing" nzTip="Suche ähnliche Stellen...">
+    <nz-upload nzType="drag" [nzBeforeUpload]="beforeCompare" [nzShowUploadList]="false"
+      class="upload-box compare-upload-box">
+      <p class="ant-upload-drag-icon">
+        <span nz-icon nzType="file-search" class="compare-icon"></span>
+      </p>
+      <p class="ant-upload-text">Dokument vergleichen</p>
+      <p class="ant-upload-hint">Wird gegen diese DB/Modell Instanz verglichen.</p>
+    </nz-upload>
+  </nz-spin>
+
+  <nz-alert *ngIf="compareError" nzType="error" nzShowIcon nzMessage="Vergleich fehlgeschlagen"
+    [nzDescription]="compareError" class="mb-4"></nz-alert>
+
+  <div *ngIf="compareResult" class="mb-4">
+    <h4 style="margin-bottom: 8px;">
+      {{ compareResult.results.length }} Treffer für <em>{{ compareFilename | slice:0:30 }}...</em>
+    </h4>
+    <nz-list [nzBordered]="true" nzSize="small">
+      <nz-list-item *ngFor="let r of compareResult.results">
+        <nz-list-item-meta [nzTitle]="'Score: ' + (r.score | number:'1.2-3')"
+          [nzDescription]="'Quelle: ' + (r.metadata['filename'] || 'Unbekannt')">
+        </nz-list-item-meta>
+        <div style="font-size: 0.85em; color: #4b5563; margin-top: 4px;">{{ r.text | slice:0:200 }}...</div>
+      </nz-list-item>
+    </nz-list>
+  </div>
+
+  <nz-divider nzText="Recherche"></nz-divider>
+
+  <div class="search-section">
+
+    <nz-input-group nzSearch [nzAddOnAfter]="suffixSearchButton">
+      <input type="text" nz-input placeholder="Suchbegriff..." [(ngModel)]="searchQuery"
+        (keyup.enter)="performSearch()" />
+    </nz-input-group>
+    <ng-template #suffixSearchButton>
+      <button nz-button nzType="primary" nzSearch (click)="performSearch()" [nzLoading]="isSearching">
+        <span nz-icon nzType="search"></span>
+      </button>
+    </ng-template>
+
+    <nz-alert *ngIf="searchError" nzType="error" nzShowIcon nzMessage="Suche fehlgeschlagen"
+      [nzDescription]="searchError" class="mt-4"></nz-alert>
+
+    <div *ngIf="queryResult?.results?.length" class="search-results mt-4">
+      <nz-list [nzBordered]="true" nzSize="small">
+        <nz-list-item *ngFor="let result of queryResult!.results">
+          <nz-list-item-meta [nzTitle]="'Score: ' + (result.score | number:'1.2-3')"
+            [nzDescription]="'Quelle: ' + (result.metadata['filename'] || 'Unbekannt')">
+          </nz-list-item-meta>
+          <div style="font-size: 0.85em; color: #374151; margin-top: 4px; line-height: 1.4;">{{ result.text |
+            slice:0:300 }}...</div>
+        </nz-list-item>
+      </nz-list>
+    </div>
+  </div>
+</div>

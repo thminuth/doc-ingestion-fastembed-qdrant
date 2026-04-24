@@ -1,0 +1,40 @@
+{
+  "name": "doc-ingestion-service",
+  "version": "1.0.0",
+  "description": "Document ingestion service: PDF/DOCX → text extraction → LangChain embeddings → Qdrant",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "ingest": "ts-node src/scripts/ingest.ts",
+    "fastembed": "npm --prefix ../fastembed-server start",
+    "fastembed:cpu": "npm --prefix ../fastembed-server run start:cpu",
+    "fastembed:gpu": "npm --prefix ../fastembed-server run start:gpu",
+    "format:write": "prettier --write \"src/**/*.ts\"",
+    "lint:check": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.17.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fastembed": "^2.1.0",
+    "mammoth": "^1.9.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.9",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.9",
+    "prettier": "^3.5.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,70 @@
+.panel-container {
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  height: 100%;
+}
+
+.panel-header {
+  margin-bottom: 24px;
+}
+
+.model-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.upload-box {
+  display: block;
+  margin-bottom: 24px;
+}
+
+.result-area {
+  margin-top: 24px;
+}
+
+.search-section {
+  margin-top: 16px;
+}
+
+.search-results {
+  margin-top: 16px;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.db-selector-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* Custom styles for the 2nd compare box */
+.compare-upload-box {
+  border-color: #6366f1 !important;
+}
+
+.compare-icon {
+  color: #6366f1 !important;
+}
+
+.dropdown-label {
+  display: block;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}

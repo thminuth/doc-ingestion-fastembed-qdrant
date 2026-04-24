@@ -1,0 +1,45 @@
+.main-wrapper {
+  min-height: 100vh;
+  background-color: #f3f4f6;
+  padding: 24px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.header {
+  margin-bottom: 32px;
+  padding: 0 12px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.title-group h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+
+.title-group p {
+  color: #6b7280;
+  margin: 4px 0 0 0;
+  font-size: 1.1rem;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.single-panel-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}

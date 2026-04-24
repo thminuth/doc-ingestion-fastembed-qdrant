@@ -1,0 +1,3 @@
+"""
+FastEmbed Strategy Modules
+"""

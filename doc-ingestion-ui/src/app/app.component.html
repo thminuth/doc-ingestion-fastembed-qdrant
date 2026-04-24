@@ -1,0 +1,19 @@
+<div class="main-wrapper">
+  <div class="header">
+    <div class="header-content">
+      <div class="title-group">
+        <h1>Vector-DB Management Console</h1>
+        <p>Verwalte Qdrant Collections & ColBERT Multi-Vector Ingestion.</p>
+      </div>
+      <div *ngIf="isLoadingModels" class="status-indicator">
+        <nz-spin nzSimple></nz-spin>
+        <span>Lade Modelle...</span>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoadingModels" class="single-panel-container">
+    <app-vector-db-panel [availableEmbedders]="availableEmbedders" storageKeyPrefix="main">
+    </app-vector-db-panel>
+  </div>
+</div>

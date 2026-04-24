@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.js.map
+local_cache_v2/
+local_cache/
+local_models/
+local_models_v2/
+local_models_v2/
+*.log
+server_log.txt
+test-data/

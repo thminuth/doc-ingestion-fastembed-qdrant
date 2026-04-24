@@ -1,0 +1,10 @@
+name: doc-ingestion
+channels:
+  - defaults
+dependencies:
+  - python-multipart
+  - pydantic
+  - fastapi
+  - python=3.10
+  - pip
+prefix: C:\Users\thoma\miniconda3\envs\doc-ingestion

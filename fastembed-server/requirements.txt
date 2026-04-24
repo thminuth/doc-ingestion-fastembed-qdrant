@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+fastembed[gpu]
+nvidia-cudnn-cu12
+# fastembed includes TextEmbedding, LateInteractionTextEmbedding, and TextCrossEncoder
+# No additional packages needed for the three strategies
