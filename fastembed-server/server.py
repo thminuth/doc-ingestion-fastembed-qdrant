@@ -189,7 +189,7 @@ async def list_models():
             "default": DEFAULT_MODELS["late_interaction"],
             "models": {
                 k: v for k, v in COLLECTION_NAMES.items()
-                if v and v.startswith("colbert_")
+                if v and v.startswith("colbert_") and not v.startswith("colbert_rerank_")
             },
         },
         "rerank": {

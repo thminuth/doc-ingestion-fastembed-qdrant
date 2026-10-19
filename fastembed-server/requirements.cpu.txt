@@ -1,0 +1,13 @@
+# CPU-only requirements for local setups (macOS / Linux) without CUDA.
+# Mirrors requirements.txt but without the GPU extras ([gpu], nvidia-cudnn-cu12),
+# which are Linux/Windows-only.
+#
+# Install (see root `npm run setup`):
+#   python3.10 -m venv .venv
+#   ./.venv/bin/python -m pip install -r requirements.cpu.txt
+
+fastapi==0.135.3
+uvicorn==0.43.0
+pydantic==2.12.5
+python-multipart==0.0.22
+fastembed==0.8.0

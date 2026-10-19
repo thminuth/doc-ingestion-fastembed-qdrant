@@ -94,16 +94,25 @@ export const addMultiVectorDocumentToStore = async (
   }
 };
 
+export interface EnsureCollectionOptions {
+  /**
+   * If false, the collection is only validated (read path): an out-of-sync
+   * collection is never deleted/re-created and a missing collection is not created.
+   */
+  allowRecreate?: boolean;
+}
+
 /**
  * Ensures a collection is configured correctly.
  */
-export const ensureCollection = async (collectionName: string, dimensions: number, isMultiVector: boolean): Promise<void> => {
+export const ensureCollection = async (collectionName: string, dimensions: number, isMultiVector: boolean, options: EnsureCollectionOptions = {}): Promise<void> => {
+  const { allowRecreate = true } = options;
   const qdrantUrl = config.qdrantUrl;
   const vectorName = collectionName.split('_')[0] || 'vectors';
 
   const checkRes = await fetch(`${qdrantUrl}/collections/${collectionName}`);
   if (checkRes.ok) {
-    const info = await checkRes.json();
+    const info = (await checkRes.json()) as any;
     const vectors = info.result?.config?.params?.vectors;
 
     const dynamicConfig = vectors?.[vectorName] || vectors;
@@ -115,9 +124,18 @@ export const ensureCollection = async (collectionName: string, dimensions: numbe
       return; // Already configured correctly
     }
 
+    // Read path: never destroy existing data because the caller used a
+    // different strategy/model. Fail explicitly instead.
+    if (!allowRecreate) {
+      throw new Error(`Collection '${collectionName}' is out of sync (Size: ${existingSize} vs ${dimensions}, Multi: ${isCurrentlyMulti} vs ${isMultiVector}) and was not modified during read-only access. Re-ingest the documents with the matching strategy/model.`);
+    }
+
     console.warn(`[vectorStoreFactory] Collection '${collectionName}' out of sync (Size: ${existingSize} vs ${dimensions}, Multi: ${isCurrentlyMulti} vs ${isMultiVector}). Re-creating...`);
     await fetch(`${qdrantUrl}/collections/${collectionName}`, { method: 'DELETE' });
     await new Promise(r => setTimeout(r, 400));
+  } else if (!allowRecreate) {
+    // Read path: leave a missing collection untouched; the search returns no results.
+    return;
   }
 
   console.log(`[vectorStoreFactory] Creating Collection: ${collectionName} (Vector Name: ${vectorName}, Dim: ${dimensions}, Multi-Vector: ${isMultiVector})`);

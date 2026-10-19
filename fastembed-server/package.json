@@ -3,14 +3,15 @@
   "version": "2.0.0",
   "description": "Multi-strategy FastEmbed server (Dense, ColBERT, Rerank) using FastAPI.",
   "scripts": {
-    "start":           "conda run --no-capture-output -n doc-ingestion python server.py",
-    "start:dense":     "conda run --no-capture-output -n doc-ingestion python server.py --strategy dense",
-    "start:colbert":   "conda run --no-capture-output -n doc-ingestion python server.py --strategy late_interaction",
-    "start:rerank":    "conda run --no-capture-output -n doc-ingestion python server.py --strategy rerank",
-    "start:gpu":       "conda run --no-capture-output -n doc-ingestion python server.py --gpu",
-    "start:cpu":       "conda run --no-capture-output -n doc-ingestion python server.py --cpu",
-    "start:dense:gpu": "conda run --no-capture-output -n doc-ingestion python server.py --strategy dense --gpu",
-    "start:colbert:gpu":"conda run --no-capture-output -n doc-ingestion python server.py --strategy late_interaction --gpu"
+    "setup:venv":       "${PYTHON:-python3.10} -m venv .venv && ./.venv/bin/python -m pip install --upgrade pip && ./.venv/bin/python -m pip install -r requirements.cpu.txt",
+    "start":            "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py",
+    "start:dense":      "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --strategy dense",
+    "start:colbert":    "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --strategy late_interaction",
+    "start:rerank":     "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --strategy rerank",
+    "start:gpu":        "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --gpu",
+    "start:cpu":        "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --cpu",
+    "start:dense:gpu":  "${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --strategy dense --gpu",
+    "start:colbert:gpu":"${FASTEMBED_PYTHON:-./.venv/bin/python} server.py --strategy late_interaction --gpu"
   },
   "author": "",
   "license": "ISC"

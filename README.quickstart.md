@@ -12,9 +12,12 @@ Wenn du die komplette technische Doku brauchst, siehe [README.md](README.md).
 
 - Node.js 20+
 - npm 10+
-- Python 3.10
-- Conda
+- Python 3.10 (z. B. Homebrew `python3.10`)
 - Docker (oder lokaler Qdrant)
+
+Conda ist **nicht** noetig: der FastEmbed-Server laeuft aus dem projekt-lokalen
+venv `fastembed-server/.venv`. Wer Conda bevorzugt, kann `environment.yml`
+weiterhin nutzen (siehe Abschnitt 3).
 
 ## 2. Qdrant starten
 
@@ -30,40 +33,56 @@ curl http://127.0.0.1:6333/collections
 
 ## 3. Abhaengigkeiten installieren
 
-### FastEmbed Server
+Empfohlen – alles auf einmal, aus dem Repo-Root:
+
+```bash
+npm run setup
+```
+
+Das erledigt:
+
+1. `fastembed-server/.venv` (Python 3.10) anlegen und `requirements.cpu.txt` installieren
+2. `node_modules` fuer Root, `ingestion-server` und `doc-ingestion-ui` installieren
+
+Voraussetzung: `python3.10` liegt im PATH. Anderer Interpreter:
+
+```bash
+PYTHON=/opt/homebrew/bin/python3.10 npm run setup
+```
+
+### Manuell (Alternative)
+
+FastEmbed-Server (Python, projekt-lokales venv):
 
 ```bash
 cd fastembed-server
-npm install
+python3.10 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install -r requirements.cpu.txt
 ```
 
-Conda-Umgebung (einmalig):
+Node-Services:
 
 ```bash
-cd ..
+npm install
+npm --prefix ingestion-server install
+npm --prefix doc-ingestion-ui install
+```
+
+### GPU / Conda (optional)
+
+Fuer CUDA (Linux/Windows) gibt es weiterhin `environment.yml`:
+
+```bash
 conda env create -f environment.yml
 conda activate doc-ingestion
 pip install "fastembed[gpu]" nvidia-cudnn-cu12
 ```
 
-CPU-only Alternative:
+Dann muss der FastEmbed-Start auf den Conda-Interpreter zeigen:
 
 ```bash
-pip install fastembed
-```
-
-### Ingestion Server
-
-```bash
-cd ingestion-server
-npm install
-```
-
-### UI
-
-```bash
-cd ../doc-ingestion-ui
-npm install
+FASTEMBED_PYTHON="conda run --no-capture-output -n doc-ingestion python" npm start
 ```
 
 ## 4. Environment setzen
@@ -80,15 +99,24 @@ Hinweis: Die UI verwendet aktuell fest `http://localhost:3100`.
 
 ## 5. Alles starten (empfohlen)
 
-In VS Code:
+Aus dem Repo-Root:
+
+```bash
+npm start
+```
+
+Startet alle drei Services in einem Terminal und erzwingt die Reihenfolge
+automatisch ueber Health-Checks:
+
+1. FastEmbed Server (Port 8001)
+2. Ingestion Server (Port 3100, wartet auf 8001)
+3. UI (Port 4200, wartet auf 3100)
+
+Beenden mit `Ctrl+C` (beendet alle drei).
+
+Alternative in VS Code:
 
 - `Terminal -> Run Task -> Start: All Services`
-
-Der Task startet in dieser Reihenfolge und in separaten Terminals:
-
-1. FastEmbed Server
-2. Ingestion Server
-3. UI (zuletzt)
 
 ## 6. Manuell starten (Alternative)
 
@@ -154,7 +182,8 @@ curl "http://localhost:3100/api/ingest/query?q=java+backend+spring&strategy=late
 - Ingestion kann nicht embeddieren:
   - Pruefe `FASTEMBED_API_URL` und FastEmbed Health.
 - FastEmbed startet nicht:
-  - Pruefe Conda-Env `doc-ingestion` und Python-Pakete.
+  - venv fehlt/kaputt? `npm run setup:python` (legt `fastembed-server/.venv` neu an).
+  - Python-Pakete pruefen: `fastembed-server/.venv/bin/python -m pip install -r fastembed-server/requirements.cpu.txt`.
 - Keine Treffer in Suche:
   - Dokument zuerst ingestieren; `threshold` ggf. senken.
 

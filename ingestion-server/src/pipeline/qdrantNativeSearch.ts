@@ -108,8 +108,14 @@ export const qdrantNativeSearch = async (
   const isMultiVectorQuery = Array.isArray(activeQuery[0]);
   const dim = isMultiVectorQuery ? activeQuery[0].length : activeQuery.length;
 
-  // Ensure collection is in sync
-  await ensureCollection(activeIndexName, dim, isMultiVectorQuery);
+  // Ensure collection is in sync. Read-only: never delete/re-create existing
+  // data because the caller picked a different strategy/model.
+  try {
+    await ensureCollection(activeIndexName, dim, isMultiVectorQuery, { allowRecreate: false });
+  } catch (err: any) {
+    console.warn(`[qdrantNativeSearch] ${err.message} Returning empty results.`);
+    return [];
+  }
 
   let response;
   try {

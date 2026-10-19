@@ -1,0 +1,19 @@
+{
+  "name": "doc-ingestion-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workspace runner: starts fastembed-server, ingestion-server and the Angular UI in the correct order.",
+  "scripts": {
+    "setup": "npm run setup:python && npm run setup:node",
+    "setup:python": "npm --prefix fastembed-server run setup:venv",
+    "setup:node": "npm install && npm --prefix ingestion-server install && npm --prefix doc-ingestion-ui install",
+    "start": "concurrently -k -n fastembed,ingestion,ui -c blue,green,magenta \"npm:start:fastembed\" \"npm:start:ingestion\" \"npm:start:ui\"",
+    "start:fastembed": "npm --prefix fastembed-server run start:cpu",
+    "start:ingestion": "wait-on -t 600000 http-get://127.0.0.1:8001/health && npm --prefix ingestion-server run dev",
+    "start:ui": "wait-on -t 600000 http-get://127.0.0.1:3100/health && npm --prefix doc-ingestion-ui start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "wait-on": "^8.0.2"
+  }
+}
