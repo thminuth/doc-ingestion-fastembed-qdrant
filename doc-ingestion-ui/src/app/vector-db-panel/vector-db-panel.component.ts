@@ -112,6 +112,10 @@ export class VectorDbPanelComponent implements OnInit, OnChanges, AfterViewInit 
   isSearching = false;
   queryResult: QueryResult | null = null;
   searchError: string | null = null;
+  /** Schwelle, mit der die angezeigten Treffer tatsaechlich ermittelt wurden. */
+  searchThresholdUsed: number | null = null;
+  /** Eingestellte Schwelle, bei der es keine Treffer gab (Auto-Relaxation). */
+  searchRelaxedFrom: number | null = null;
 
   // Compare state
   isComparing = false;
@@ -422,16 +426,28 @@ export class VectorDbPanelComponent implements OnInit, OnChanges, AfterViewInit 
     this.isSearching = true;
     this.searchError = null;
     this.queryResult = null;
+    this.searchThresholdUsed = null;
+    this.searchRelaxedFrom = null;
 
+    this.runSearch(this.searchThreshold, 0);
+  }
+
+  /**
+   * Fuehrt die Suche aus. Liefert die eingestellte Schwelle nichts, wird
+   * einmal mit einer niedrigeren Schwelle wiederholt - sonst bleibt der
+   * Bildschirm leer und es ist nicht erkennbar, ob die Query oder die
+   * Schwelle das Problem ist.
+   */
+  private runSearch(threshold: number, attempt: number): void {
     const limitValue = Number(this.searchLimit);
     console.log(
-      `[VectorDbPanel] performSearch - Query: "${this.searchQuery}", Limit (Raw): ${this.searchLimit}, Limit (Num): ${limitValue}, Threshold: ${this.searchThreshold}`,
+      `[VectorDbPanel] runSearch - Query: "${this.searchQuery}", Threshold: ${threshold}, Strategy: ${this.strategy}, Model: ${this.selectedModel}`,
     );
 
     this.ingestService
       .queryDocuments({
         query: this.searchQuery.trim(),
-        threshold: this.searchThreshold,
+        threshold,
         vectorStore: this.selectedVectorStore,
         strategy: this.strategy,
         embeddingProvider: this.selectedEmbeddingProvider,
@@ -441,14 +457,38 @@ export class VectorDbPanelComponent implements OnInit, OnChanges, AfterViewInit 
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
+          const hits = res.results?.length ?? 0;
+          if (hits === 0 && attempt < 6) {
+            // Schwelle war zu hoch: schrittweise senken, bis etwas gefunden wird.
+            const floor = 0.3;
+            const next =
+              threshold > floor
+                ? Math.max(floor, Math.round(threshold * 0.85 * 1000) / 1000)
+                : threshold;
+            if (next < threshold) {
+              this.runSearch(next, attempt + 1);
+              return;
+            }
+          }
           this.isSearching = false;
           this.queryResult = res;
+          this.searchThresholdUsed = threshold;
+          this.searchRelaxedFrom = attempt > 0 ? this.searchThreshold : null;
         },
         error: (err) => {
           this.isSearching = false;
           this.searchError = err.error?.message || 'Search failed.';
         },
       });
+  }
+
+  /** Senkt die Schwelle und wiederholt die Suche. */
+  lowerThresholdAndSearch(): void {
+    this.searchThreshold = Math.max(
+      0,
+      Math.round((this.searchThreshold - 0.05) * 1000) / 1000,
+    );
+    this.performSearch();
   }
 
   /**

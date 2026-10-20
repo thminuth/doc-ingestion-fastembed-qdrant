@@ -185,7 +185,37 @@
     <nz-alert *ngIf="searchError" nzType="error" nzShowIcon nzMessage="Suche fehlgeschlagen"
       [nzDescription]="searchError" class="mt-4"></nz-alert>
 
+    <nz-alert *ngIf="queryResult && !(queryResult.results?.length)" nzType="warning" nzShowIcon class="mt-4"
+      nzMessage="Keine Treffer" [nzDescription]="noResultsDescription">
+    </nz-alert>
+
+    <ng-template #noResultsDescription>
+      <div>
+        Kein Dokument erreicht die Schwelle von {{ (searchThresholdUsed ?? searchThreshold) | percent:'1.1-2' }} in
+        Collection {{ activeCollectionName || '?' }}.
+        <span *ngIf="searchRelaxedFrom">
+          (eingestellt war {{ searchRelaxedFrom | percent:'1.1-2' }})
+        </span>
+        Die Schwelle ist zu hoch oder die Collection passt nicht zum Modell.
+        <button nz-button nzType="primary" size="small" (click)="lowerThresholdAndSearch()" style="margin-top: 8px;">
+          <span nz-icon nzType="minus"></span>
+          Schwelle senken und erneut suchen
+        </button>
+      </div>
+    </ng-template>
+
+    <nz-alert *ngIf="searchRelaxedFrom" nzType="info" nzShowIcon class="mt-4"
+      nzMessage="Keine Treffer über der eingestellten Schwelle"
+      [nzDescription]="'Angezeigt werden die besten Treffer ab ' + ((searchThresholdUsed ?? 0) | percent:'1.1-2') + ' - eingestellt war ' + (searchRelaxedFrom | percent:'1.1-2') + '.'">
+    </nz-alert>
+
     <div *ngIf="queryResult?.results?.length" class="search-results mt-4">
+      <h4 style="margin-bottom: 8px;">
+        {{ queryResult?.results?.length }} Treffer
+        <small style="font-weight: 400; color: #6b7280;">
+          · Collection {{ activeCollectionName || '?' }} · Schwelle {{ (searchThresholdUsed ?? 0) | percent:'1.1-2' }}
+        </small>
+      </h4>
       <nz-list [nzBordered]="true" nzSize="small">
         <nz-list-item *ngFor="let result of queryResult!.results">
           <nz-list-item-meta [nzTitle]="'Score: ' + (result.score | number:'1.2-3')"
