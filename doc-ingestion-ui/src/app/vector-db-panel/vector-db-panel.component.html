@@ -46,13 +46,22 @@
             <nz-option *ngFor="let m of currentFastEmbedModels" [nzValue]="m" [nzLabel]="m"></nz-option>
           </nz-select>
         </div>
+
+        <nz-alert *ngIf="showEmptyCollectionHint" nzType="warning" nzShowIcon style="margin-top: 8px;"
+          nzMessage="Diese Collection enthält keine Daten"
+          [nzDescription]="'In ' + activeCollectionName + ' liegen keine Punkte. Suche/Vergleich finden hier nichts. Nutze die Strategie/Modell-Kombination, mit der ingestiert wurde. Collections mit Daten: ' + (populatedCollections || 'keine') + '.'">
+        </nz-alert>
       </div>
       <div class="search-settings">
         <div style="margin-bottom: 20px;">
-          <small style="font-weight: 600; color: #6b7280; display: block; margin-bottom: 4px;">Vektor-Schwelle: {{
-            searchThreshold | percent }}</small>
-          <nz-slider [nzMin]="0" [nzMax]="1" [nzStep]="0.01" [(ngModel)]="searchThreshold"
-            (nzOnAfterChange)="onModelChange()"></nz-slider>
+          <small style="font-weight: 600; color: #6b7280; display: block; margin-bottom: 4px;">
+            {{ thresholdLabel }}: {{ searchThreshold | percent:'1.1-2' }}
+          </small>
+          <nz-slider [nzMin]="thresholdMin" [nzMax]="thresholdMax" [nzStep]="thresholdStep"
+            [(ngModel)]="searchThreshold" (nzOnAfterChange)="onModelChange()"></nz-slider>
+          <small style="color: #9ca3af; display: block; line-height: 1.35;">
+            {{ currentThresholdProfile.description }}
+          </small>
         </div>
 
         <div style="margin-bottom: 12px;">
@@ -69,17 +78,26 @@
   </div>
 
   <nz-spin [nzSpinning]="isUploading" nzTip="Verarbeite Dokumente...">
-    <nz-upload nzType="drag" [nzMultiple]="true" nzDirectory [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false"
+    <nz-upload #ingestUpload nzType="drag" [nzMultiple]="true" [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false"
       class="upload-box">
       <p class="ant-upload-drag-icon">
         <span nz-icon nzType="inbox"></span>
       </p>
       <p class="ant-upload-text">Dokumente hier ablegen</p>
-      <p class="ant-upload-hint">PDF, DOCX, MD (max 20MB)</p>
+      <p class="ant-upload-hint">PDF, DOCX, MD (max 20MB) - auch ganze Ordner</p>
     </nz-upload>
   </nz-spin>
 
-  <div class="result-area" *ngIf="uploadResults.length > 0 || errorMessages.length > 0">
+  <div *ngIf="isUploading" style="font-size: 0.85em; color: #6b7280; margin: 8px 0 0 0;">
+    {{ uploadDone }} / {{ uploadTotal }} Dateien verarbeitet
+  </div>
+
+  <div class="result-area" *ngIf="uploadSummary || errorMessages.length > 0">
+    <nz-alert *ngIf="uploadSummary" nzType="success" nzShowIcon
+      [nzMessage]="uploadSummary.indexed + ' Dokument(e) indexiert'"
+      [nzDescription]="'Collection ' + (activeCollectionName || 'unbekannt') + ' enthält jetzt ' + (activeCollectionPoints === null ? '-' : activeCollectionPoints) + ' Punkte.'"
+      class="mb-4"></nz-alert>
+
     <nz-alert *ngIf="errorMessages.length > 0" nzType="error" nzShowIcon
       [nzMessage]="errorMessages.length + ' Fehler beim Upload'" [nzDescription]="errorDescription"
       class="mb-4"></nz-alert>
@@ -111,6 +129,35 @@
     <h4 style="margin-bottom: 8px;">
       {{ compareResult.results.length }} Treffer für <em>{{ compareFilename | slice:0:30 }}...</em>
     </h4>
+
+    <nz-alert *ngIf="compareResult.exactMatch === false" nzType="warning" nzShowIcon class="mb-4"
+      nzMessage="Dieses Dokument ist nicht in der Collection enthalten"
+      [nzDescription]="missingDocumentDescription">
+    </nz-alert>
+
+    <ng-template #missingDocumentDescription>
+      <div>
+        <p *ngIf="compareResult.results.length > 0">
+          Der Text des hochgeladenen Dokuments existiert in der Collection nicht. Bester Treffer:
+          {{ compareResult.results[0].metadata['filename'] || 'Unbekannt' }}
+          ({{ compareResult.results[0].score | number:'1.2-3' }}).
+        </p>
+        <p *ngIf="compareResult.results.length === 0">
+          Es wurden keine Treffer gefunden - das hochgeladene Dokument existiert in der Collection nicht.
+        </p>
+        <button nz-button nzType="primary" (click)="indexAndCompareAgain()" [nzLoading]="isIndexingCompareFile"
+          style="margin-top: 8px;">
+          <span nz-icon nzType="plus"></span>
+          Dokument jetzt indexieren und erneut vergleichen
+        </button>
+      </div>
+    </ng-template>
+
+    <nz-alert *ngIf="compareResult.exactMatch === true" nzType="success" nzShowIcon class="mb-4"
+      nzMessage="Dokument gefunden"
+      [nzDescription]="'Das verglichene Dokument ist in der Collection enthalten und führt das Ranking mit ' + (compareResult.results.length > 0 ? (compareResult.results[0].score | number:'1.2-3') : '0') + ' an.'">
+    </nz-alert>
+
     <nz-list [nzBordered]="true" nzSize="small">
       <nz-list-item *ngFor="let r of compareResult.results">
         <nz-list-item-meta [nzTitle]="'Score: ' + (r.score | number:'1.2-3')"

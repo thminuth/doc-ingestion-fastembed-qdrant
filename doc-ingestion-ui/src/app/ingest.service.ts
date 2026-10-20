@@ -18,9 +18,23 @@ export interface QueryResult {
   }[];
 }
 
+export interface ThresholdProfile {
+  strategy: string;
+  label: string;
+  description: string;
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+  normalization: string;
+  prefilterThreshold: number;
+}
+
 export interface ModelsResult {
   embedders: any;
   llms: string[];
+  thresholds: Record<string, ThresholdProfile>;
+  collections?: Record<string, number>;
 }
 
 export interface QueryOptions {
@@ -96,7 +110,7 @@ export class IngestService {
     return this.http.post<void>('http://localhost:3100/api/ingest/log-selection', { strategy, embeddingProvider });
   }
 
-  compareDocument(opts: CompareOptions): Observable<{ store: string, results: any[] }> {
+  compareDocument(opts: CompareOptions): Observable<{ store: string; collection?: string; results: any[]; exactMatch?: boolean }> {
     const { file, threshold = 0.4, limit = 10, vectorStore, strategy, embeddingProvider } = opts;
     
     const formData = new FormData();
@@ -108,6 +122,6 @@ export class IngestService {
     if (embeddingProvider) formData.append('embeddingProvider', embeddingProvider);
     if (opts.model) formData.append('model', opts.model);
 
-    return this.http.post<{ store: string, results: any[] }>('http://localhost:3100/api/ingest/compare', formData);
+    return this.http.post<{ store: string; collection?: string; results: any[]; exactMatch?: boolean }>('http://localhost:3100/api/ingest/compare', formData);
   }
 }

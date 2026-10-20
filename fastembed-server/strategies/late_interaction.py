@@ -8,7 +8,8 @@ Unlike dense embedding, each text produces a MATRIX of token-level vectors
 (shape: num_tokens × dim), enabling MaxSim scoring in Qdrant.
 
 Supported models:
-  - colbert-ir/colbertv2.0  (default)
+  - jinaai/jina-colbert-v2  (default)
+  - colbert-ir/colbertv2.0
 
 API prefix: /colbert
 """

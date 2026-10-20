@@ -4,6 +4,12 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import config from '../config';
 import { ensureCollection } from './vectorStoreFactory';
 import { FastEmbedAdapter } from './fastembedAdapter';
+import {
+  getRetrievalProfile,
+  getThresholdProfile,
+  normalizeScore,
+  toRawPrefilter,
+} from './scoreConfig';
 
 // ---------------------------------------------------------------------------
 // Singleton-Client
@@ -32,7 +38,7 @@ export interface QdrantSearchOptions {
   indexName?: string;
   /** Anzahl Ergebnisse (default: 4) */
   limit?: number;
-  /** Minimum-Score – Ergebnisse unterhalb werden serverseitig verworfen (default: 0.5) */
+  /** Minimum-Score – Ergebnisse unterhalb werden verworfen (default: strategiespezifisch aus scoreConfig) */
   scoreThreshold?: number;
   /** Nativer Qdrant-Filter, z. B. { must: [{ key: 'metadata.filename', match: { value: 'x.pdf' } }] } */
   filter?: Record<string, any>;
@@ -74,14 +80,17 @@ export const qdrantNativeSearch = async (
   opts: QdrantSearchOptions = {}
 ): Promise<[Document, number][]> => {
   const {
-    scoreThreshold = 0.5,
     filter,
     hnswEf = 256,
     rescore = true,
     oversampling = 2.0,
-    alpha = 0.5,
     queryVectors,
   } = opts;
+
+  // Strategy-specific score scale. The user-facing threshold is always on the
+  // normalised 0..1 score (cosine / mean MaxSim / sigmoid logit).
+  const profile = getThresholdProfile(embeddings.strategy);
+  const threshold = opts.scoreThreshold ?? profile.default;
 
   let limit = opts.limit ?? 4;
   if (embeddings.strategy === 'colbert_rerank') {
@@ -99,7 +108,11 @@ export const qdrantNativeSearch = async (
     activeIndexName = opts.indexName || "";
     if (!activeIndexName) throw new Error("Index name must be provided when searching with raw queryVectors.");
   } else {
-    const embedResult = await embeddings.embedQuery(query);
+    // Pass the selected model explicitly. Without it the FastEmbed server
+    // falls back to the strategy default, which resolves to a DIFFERENT
+    // collection (e.g. colbert_colbertv2 instead of colbert_jina_v2) and the
+    // search silently returns no results.
+    const embedResult = await embeddings.embedQuery(query, embeddings.model);
     activeQuery = embedResult.embedding;
     activeIndexName = embedResult.collectionName;
   }
@@ -107,6 +120,15 @@ export const qdrantNativeSearch = async (
   // Detect if query is a matrix (Multi-Vector) or a flat vector (Standard)
   const isMultiVectorQuery = Array.isArray(activeQuery[0]);
   const dim = isMultiVectorQuery ? activeQuery[0].length : activeQuery.length;
+
+  // MaxSim grows with the query length, so both the pre-filter and the final
+  // score are normalised by the number of query tokens.
+  const queryTokenCount = isMultiVectorQuery ? activeQuery.length : 1;
+  const prefilterThreshold = toRawPrefilter(
+    profile,
+    threshold,
+    queryTokenCount,
+  );
 
   // Ensure collection is in sync. Read-only: never delete/re-create existing
   // data because the caller picked a different strategy/model.
@@ -121,13 +143,13 @@ export const qdrantNativeSearch = async (
   try {
     // Hybrid / Keyword / Vector Search
     const vectorName = activeIndexName.split('_')[0] || 'vectors';
-    console.log(`[qdrantNativeSearch] Executing query on '${activeIndexName}' - Limit: ${limit}, Threshold: ${scoreThreshold}`);
+    console.log(`[qdrantNativeSearch] Executing query on '${activeIndexName}' | strategy: ${embeddings.strategy} | limit: ${limit} | threshold: ${threshold} (${profile.normalization}) | prefilter: ${prefilterThreshold}`);
     
     response = await client.query(activeIndexName, {
       query: activeQuery,
       using: vectorName,
       limit: limit,
-      score_threshold: scoreThreshold,
+      score_threshold: prefilterThreshold > 0 ? prefilterThreshold : undefined,
       params: {
         hnsw_ef: hnswEf,
         exact: false,
@@ -171,20 +193,48 @@ export const qdrantNativeSearch = async (
     try {
       // For colbert_rerank, we use the default reranker: Xenova/ms-marco-MiniLM-L-6-v2
       const rerankedResults = await embeddings.rerank(query, documentsToRerank);
-      
-      // Return reranked results sorted by cross-encoder score
-      return rerankedResults.map(r => {
-        const originalPoint = rawPoints[r.index];
-        return [originalPoint.doc, r.score];
-      });
+
+      // Normalise the cross-encoder logit (sigmoid) and apply the user
+      // threshold to the FINAL score, not to the retrieval score.
+      return rerankedResults
+        .map((r) => {
+          const originalPoint = rawPoints[r.index];
+          if (!originalPoint) return null;
+          return {
+            doc: originalPoint.doc,
+            score: normalizeScore(r.score, profile, queryTokenCount),
+          };
+        })
+        .filter((r): r is { doc: Document; score: number } => r !== null)
+        .filter((r) => r.score >= threshold)
+        .sort((a, b) => b.score - a.score)
+        .map((r) => [r.doc, r.score] as [Document, number]);
     } catch (err: any) {
       console.error(`[qdrantNativeSearch] Reranking failed fallback to vector score:`, err.message);
-      // Fallback to original results if reranking fails
+      // Fall back to the retrieval scale (cosine / mean MaxSim) with its default
+      // threshold, since the user threshold refers to the rerank scale.
+      const fallbackProfile = getRetrievalProfile(embeddings.strategy);
+      return rawPoints
+        .map((p) => ({
+          doc: p.doc,
+          score: normalizeScore(p.score, fallbackProfile, queryTokenCount),
+        }))
+        .filter((p) => p.score >= fallbackProfile.default)
+        .sort((a, b) => b.score - a.score)
+        .map((p) => [p.doc, p.score] as [Document, number]);
     }
   }
 
-  // Default: Return original vector results
-  return rawPoints.map(p => [p.doc, p.score] as [Document, number]);
+  // Dense / ColBERT: normalise the retrieved score and apply the threshold to
+  // the final score.
+  return rawPoints
+    .map((p) => ({
+      doc: p.doc,
+      score: normalizeScore(p.score, profile, queryTokenCount),
+    }))
+    .filter((p) => p.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .map((p) => [p.doc, p.score] as [Document, number]);
 };
 
 // ---------------------------------------------------------------------------

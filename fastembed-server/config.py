@@ -20,7 +20,7 @@ SERVER_PORT = 8001
 
 DEFAULT_MODELS = {
     "dense":            "intfloat/multilingual-e5-large",
-    "late_interaction": "colbert-ir/colbertv2.0",
+    "late_interaction": "jinaai/jina-colbert-v2",
     "rerank":           "Xenova/ms-marco-MiniLM-L-6-v2",
     "colbert_rerank":   "jinaai/jina-colbert-v2",
 }

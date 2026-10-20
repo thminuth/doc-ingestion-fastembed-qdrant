@@ -13,7 +13,8 @@
   </div>
 
   <div *ngIf="!isLoadingModels" class="single-panel-container">
-    <app-vector-db-panel [availableEmbedders]="availableEmbedders" storageKeyPrefix="main">
+    <app-vector-db-panel [availableEmbedders]="availableEmbedders" [thresholdProfiles]="thresholdProfiles"
+      [collectionCounts]="collectionCounts" storageKeyPrefix="main">
     </app-vector-db-panel>
   </div>
 </div>

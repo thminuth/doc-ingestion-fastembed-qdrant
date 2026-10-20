@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { IngestService } from './ingest.service';
+import { ThresholdProfile } from './ingest.service';
 import { VectorDbPanelComponent } from './vector-db-panel/vector-db-panel.component';
 
 @Component({
@@ -15,6 +16,8 @@ import { VectorDbPanelComponent } from './vector-db-panel/vector-db-panel.compon
 })
 export class AppComponent implements OnInit {
   availableEmbedders: any = null;
+  thresholdProfiles: Record<string, ThresholdProfile> | null = null;
+  collectionCounts: Record<string, number> = {};
   isLoadingModels = true;
   private destroyRef = inject(DestroyRef);
 
@@ -30,8 +33,15 @@ export class AppComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.availableEmbedders = res.embedders;
+          this.thresholdProfiles = res.thresholds;
+          this.collectionCounts = res.collections ?? {};
           this.isLoadingModels = false;
-          console.log('[AppComponent] Modelle geladen:', res.embedders.length);
+          console.log(
+            '[AppComponent] Modelle geladen:',
+            Object.keys(res.embedders ?? {}).length,
+            'Strategien, Collections:',
+            this.collectionCounts,
+          );
         },
         error: () => {
           this.isLoadingModels = false;

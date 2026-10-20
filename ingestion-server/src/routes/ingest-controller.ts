@@ -12,6 +12,7 @@ import {
   qdrantNativeSearch,
 } from "../pipeline/qdrantNativeSearch";
 import { IngestPipelineResult } from "../pipeline/types";
+import { getThresholdProfiles } from "../pipeline/scoreConfig";
 import { clearVectorStore } from "../pipeline/vectorStoreFactory";
 
 type FastEmbedModelsResponse = Record<
@@ -118,7 +119,11 @@ async function queryHandler(
     const limit = limitStr ? parseInt(limitStr, 10) : 4;
 
     const thresholdStr = req.query["threshold"] as string;
-    const threshold = thresholdStr ? parseFloat(thresholdStr) : 0.4;
+    const parsedThreshold = thresholdStr ? parseFloat(thresholdStr) : NaN;
+    // undefined => strategy-specific default from scoreConfig
+    const threshold = Number.isFinite(parsedThreshold)
+      ? parsedThreshold
+      : undefined;
     const strategy = req.query["strategy"] as string | undefined;
 
     console.log(
@@ -212,9 +217,46 @@ async function modelsHandler(
     res.status(200).json({
       embedders: models,
       llms: [],
+      thresholds: getThresholdProfiles(),
+      collections: await getCollectionPointCounts(),
     });
   } catch (err: any) {
     next(err);
+  }
+}
+
+/**
+ * Reads the point count of every Qdrant collection. The UI uses this to detect
+ * which strategy/model actually holds data, so that a comparison does not
+ * silently run against an empty collection (e.g. Dense while the documents were
+ * ingested with ColBERT).
+ */
+async function getCollectionPointCounts(): Promise<Record<string, number>> {
+  const base = config.qdrantUrl;
+  try {
+    const listRes = await fetch(`${base}/collections`);
+    if (!listRes.ok) return {};
+    const list: any = await listRes.json();
+    const names: string[] = (list?.result?.collections ?? []).map(
+      (c: any) => c.name,
+    );
+    const counts: Record<string, number> = {};
+    for (const name of names) {
+      try {
+        const infoRes = await fetch(`${base}/collections/${name}`);
+        if (!infoRes.ok) {
+          counts[name] = 0;
+          continue;
+        }
+        const info: any = await infoRes.json();
+        counts[name] = info?.result?.points_count ?? 0;
+      } catch {
+        counts[name] = 0;
+      }
+    }
+    return counts;
+  } catch {
+    return {};
   }
 }
 
@@ -251,9 +293,13 @@ async function compareHandler(
       return;
     }
 
-    const threshold = req.body.threshold
+    const parsedThreshold = req.body.threshold
       ? parseFloat(req.body.threshold as string)
-      : 0.4;
+      : NaN;
+    // undefined => strategy-specific default from scoreConfig
+    const threshold = Number.isFinite(parsedThreshold)
+      ? parsedThreshold
+      : undefined;
 
     console.log(
       `[doc-ingestion-service] Vergleich gestartet | Datei: ${originalname} | Strategy: ${strategy}`,
@@ -301,7 +347,33 @@ async function compareHandler(
         metadata: doc.metadata,
       }));
 
-    res.status(200).json({ store: "qdrant", results: mapped });
+    // Detect whether the compared document itself is part of the collection.
+    // If it is, it has to lead the ranking (score 1.0) - if it is not, the
+    // caller gets a clear hint that the document is simply not stored yet
+    // instead of silently receiving only "similar" documents.
+    const normalizeText = (value: string): string =>
+      value.replace(/\r\n/g, "\n").replace(/\s+/g, " ").trim();
+
+    const uploadedText = normalizeText(text);
+    const exactMatchIndex = mapped.findIndex(
+      (r) => normalizeText(r.text) === uploadedText,
+    );
+    const exactMatch = exactMatchIndex >= 0;
+    if (exactMatch && exactMatchIndex > 0) {
+      const [hit] = mapped.splice(exactMatchIndex, 1);
+      mapped.unshift(hit);
+    }
+
+    console.log(
+      `[doc-ingestion-service] Vergleich fertig | Datei: ${originalname} | Collection: ${indexName} | Treffer: ${mapped.length} | Dokument selbst in der DB: ${exactMatch}`,
+    );
+
+    res.status(200).json({
+      store: "qdrant",
+      collection: indexName,
+      results: mapped,
+      exactMatch,
+    });
   } catch (err: any) {
     console.error(`[ingest-controller] Vergleich fehlgeschlagen:`, err.message);
     next(err);

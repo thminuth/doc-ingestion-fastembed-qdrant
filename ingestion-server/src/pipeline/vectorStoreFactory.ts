@@ -3,6 +3,13 @@ import { FastEmbedAdapter } from './fastembedAdapter';
 import { Document } from './qdrantNativeSearch';
 
 /**
+ * Qdrant comparator required for ColBERT late-interaction / multi-vector
+ * collections. `ensureCollection` enforces it so a collection created with a
+ * different comparator is never silently accepted.
+ */
+export const REQUIRED_MULTIVECTOR_COMPARATOR = 'max_sim';
+
+/**
  * Multi-Vector Storage logic (ColBERT-style)
  * Stores one document as ONE point with a matrix of vectors.
  */
@@ -118,19 +125,38 @@ export const ensureCollection = async (collectionName: string, dimensions: numbe
     const dynamicConfig = vectors?.[vectorName] || vectors;
     const multivectorConfig = dynamicConfig?.multivector_config;
     const existingSize = dynamicConfig?.size;
+    const existingComparator: string | undefined =
+      multivectorConfig?.comparator;
 
     const isCurrentlyMulti = !!multivectorConfig;
-    if (isCurrentlyMulti === isMultiVector && existingSize === dimensions) {
+    const isComparatorValid =
+      !isMultiVector || existingComparator === REQUIRED_MULTIVECTOR_COMPARATOR;
+    const isInSync =
+      isCurrentlyMulti === isMultiVector &&
+      existingSize === dimensions &&
+      isComparatorValid;
+
+    if (isInSync) {
       return; // Already configured correctly
     }
+
+    const mismatch = [
+      `Size: ${existingSize} vs ${dimensions}`,
+      `Multi: ${isCurrentlyMulti} vs ${isMultiVector}`,
+      ...(isMultiVector
+        ? [
+            `MaxSim-Comparator: ${existingComparator ?? 'none'} vs ${REQUIRED_MULTIVECTOR_COMPARATOR}`,
+          ]
+        : []),
+    ].join(', ');
 
     // Read path: never destroy existing data because the caller used a
     // different strategy/model. Fail explicitly instead.
     if (!allowRecreate) {
-      throw new Error(`Collection '${collectionName}' is out of sync (Size: ${existingSize} vs ${dimensions}, Multi: ${isCurrentlyMulti} vs ${isMultiVector}) and was not modified during read-only access. Re-ingest the documents with the matching strategy/model.`);
+      throw new Error(`Collection '${collectionName}' is out of sync (${mismatch}) and was not modified during read-only access. Re-ingest the documents with the matching strategy/model.`);
     }
 
-    console.warn(`[vectorStoreFactory] Collection '${collectionName}' out of sync (Size: ${existingSize} vs ${dimensions}, Multi: ${isCurrentlyMulti} vs ${isMultiVector}). Re-creating...`);
+    console.warn(`[vectorStoreFactory] Collection '${collectionName}' out of sync (${mismatch}). Re-creating...`);
     await fetch(`${qdrantUrl}/collections/${collectionName}`, { method: 'DELETE' });
     await new Promise(r => setTimeout(r, 400));
   } else if (!allowRecreate) {
@@ -143,7 +169,7 @@ export const ensureCollection = async (collectionName: string, dimensions: numbe
   const vectorConfig = {
     size: dimensions,
     distance: 'Cosine',
-    ...(isMultiVector ? { multivector_config: { comparator: 'max_sim' } } : {})
+    ...(isMultiVector ? { multivector_config: { comparator: REQUIRED_MULTIVECTOR_COMPARATOR } } : {})
   };
 
   const createRes = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
